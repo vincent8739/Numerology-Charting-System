@@ -1,0 +1,8 @@
+{
+  "name": "Remix 數字占卜排盤系統",
+  "description": "專業數字占卜排盤系統，支援求占者、事由、公曆起卦時間干支轉換、數字卦三個三位數起卦排盤、先天八卦數理推演、六親世應、六神配排、伏神飛神推算、月建旺衰、月破、日辰日沖暗動、動變生剋（回頭生剋、化進化退）、D3.js六爻日月能量量化圖譜與AI深研解卦",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
