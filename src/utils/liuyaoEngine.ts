@@ -1579,9 +1579,15 @@ export const calculateNumberGua = (
   num2: number,
   num3: number
 ): NumberGuaCalculation => {
-  const validNum1 = Math.max(1, Math.floor(Math.abs(Number(num1) || 431)));
-  const validNum2 = Math.max(1, Math.floor(Math.abs(Number(num2) || 379)));
-  const validNum3 = Math.max(1, Math.floor(Math.abs(Number(num3) || 847)));
+  const parseNum = (n: number, defaultVal: number) => {
+    if (typeof n === "number" && !isNaN(n)) {
+      return Math.max(0, Math.floor(Math.abs(n)));
+    }
+    return defaultVal;
+  };
+  const validNum1 = parseNum(num1, 431);
+  const validNum2 = parseNum(num2, 379);
+  const validNum3 = parseNum(num3, 847);
 
   // 1. 求下卦 (第一數除以 8，餘數對應先天八卦，0 為 8 坤卦)
   const lowerRemainder = validNum1 % 8 === 0 ? 8 : validNum1 % 8;

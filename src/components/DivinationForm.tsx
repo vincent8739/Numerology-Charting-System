@@ -61,9 +61,9 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
   const [validationError, setValidationError] = useState<string>("");
 
   // Derived validations and calculations
-  const isNum1Valid = numStr1.length === 3;
-  const isNum2Valid = numStr2.length === 3;
-  const isNum3Valid = numStr3.length === 3;
+  const isNum1Valid = numStr1.length === 3 && /^\d{3}$/.test(numStr1);
+  const isNum2Valid = numStr2.length === 3 && /^\d{3}$/.test(numStr2);
+  const isNum3Valid = numStr3.length === 3 && /^\d{3}$/.test(numStr3);
   const isAllNumbersValid = isNum1Valid && isNum2Valid && isNum3Valid;
 
   const n1 = isNum1Valid ? parseInt(numStr1, 10) : null;
@@ -78,7 +78,7 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
     const val1 = parseInt(numStr1, 10);
     const val2 = parseInt(numStr2, 10);
     const val3 = parseInt(numStr3, 10);
-    if (val1 >= 100 && val2 >= 100 && val3 >= 100) {
+    if (!isNaN(val1) && !isNaN(val2) && !isNaN(val3) && numStr1.length === 3 && numStr2.length === 3 && numStr3.length === 3) {
       return calculateNumberGua(val1, val2, val3);
     }
     return null;
@@ -122,13 +122,9 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
   const handleNumChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    // 嚴格限制：僅接受數字，去除所有非數字字元
+    // 僅接受數字，去除所有非數字字元
     let val = e.target.value.replace(/\D/g, "");
-    // 開頭不允許為 0，避免出現 0 開頭或 0453 之情況
-    if (val.startsWith("0")) {
-      val = val.replace(/^0+/, "");
-    }
-    // 嚴格限制最多 3 位數
+    // 允許以 0 開頭（例如 000、045、007），嚴格限制最多 3 位數
     if (val.length > 3) {
       val = val.slice(0, 3);
     }
@@ -138,8 +134,8 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAllNumbersValid || !n1 || !n2 || !n3 || !numGuaCalc) {
-      setValidationError("請在三個起卦欄位皆輸入完整的 3 位數字（100 ~ 999）！");
+    if (!isAllNumbersValid || n1 === null || n2 === null || n3 === null || !numGuaCalc) {
+      setValidationError("請在三個起卦欄位皆輸入完整的 3 位數字（000 ~ 999）！");
       return;
     }
     onCalculate({
@@ -446,11 +442,11 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
                 id="input-number-1"
                 type="text"
                 inputMode="numeric"
-                pattern="[1-9][0-9]{2}"
+                pattern="[0-9]{3}"
                 maxLength={3}
                 value={numStr1}
                 onChange={handleNumChange(setNumStr1)}
-                placeholder="例如：431"
+                placeholder="例如：431 或 045"
                 className="w-full rounded-lg border border-stone-300 bg-white px-3.5 py-2.5 text-center font-mono text-xl font-bold tracking-wider text-stone-900 shadow-2xs focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 required
               />
@@ -477,7 +473,7 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
                 </>
               ) : (
                 <div className="text-center text-stone-400 py-1">
-                  <span className="text-xs">請輸入 3 位數（100 ~ 999）</span>
+                  <span className="text-xs">請輸入 3 位數（000 ~ 999）</span>
                 </div>
               )}
             </div>
@@ -497,11 +493,11 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
                 id="input-number-2"
                 type="text"
                 inputMode="numeric"
-                pattern="[1-9][0-9]{2}"
+                pattern="[0-9]{3}"
                 maxLength={3}
                 value={numStr2}
                 onChange={handleNumChange(setNumStr2)}
-                placeholder="例如：379"
+                placeholder="例如：379 或 007"
                 className="w-full rounded-lg border border-stone-300 bg-white px-3.5 py-2.5 text-center font-mono text-xl font-bold tracking-wider text-stone-900 shadow-2xs focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 required
               />
@@ -528,7 +524,7 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
                 </>
               ) : (
                 <div className="text-center text-stone-400 py-1">
-                  <span className="text-xs">請輸入 3 位數（100 ~ 999）</span>
+                  <span className="text-xs">請輸入 3 位數（000 ~ 999）</span>
                 </div>
               )}
             </div>
@@ -548,11 +544,11 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
                 id="input-number-3"
                 type="text"
                 inputMode="numeric"
-                pattern="[1-9][0-9]{2}"
+                pattern="[0-9]{3}"
                 maxLength={3}
                 value={numStr3}
                 onChange={handleNumChange(setNumStr3)}
-                placeholder="例如：847"
+                placeholder="例如：847 或 000"
                 className="w-full rounded-lg border border-stone-300 bg-white px-3.5 py-2.5 text-center font-mono text-xl font-bold tracking-wider text-stone-900 shadow-2xs focus:border-rose-600 focus:outline-none focus:ring-1 focus:ring-rose-500"
                 required
               />
@@ -580,7 +576,7 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
                 </>
               ) : (
                 <div className="text-center text-stone-400 py-1">
-                  <span className="text-xs">請輸入 3 位數（100 ~ 999）</span>
+                  <span className="text-xs">請輸入 3 位數（000 ~ 999）</span>
                 </div>
               )}
             </div>
@@ -771,7 +767,7 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
                 請在上方三個欄位輸入完整的 3 位數字
               </span>
               <span className="text-xs text-stone-500">
-                三個欄位皆填妥 3 位數（100 ~ 999）後，系統將即時推演出本卦、變卦及六爻動靜圖譜
+                三個欄位皆填妥 3 位數（000 ~ 999）後，系統將即時推演出本卦、變卦及六爻動靜圖譜
               </span>
             </div>
           )}
