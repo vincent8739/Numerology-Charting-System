@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Clock, User, HelpCircle, RefreshCw, Hash, CheckCircle2, ArrowRight, Sparkles, BookOpen, Layers } from "lucide-react";
+import { Clock, User, HelpCircle, RefreshCw, Hash, CheckCircle2, ArrowRight, Sparkles, Layers, AlertCircle } from "lucide-react";
 import { SixRelative, YaoRemainder, NumberGuaCalculation } from "../types/liuyao";
 import { getGanzhiFromDate, GanzhiResult } from "../utils/calendar";
 import { calculateNumberGua, EARLY_HEAVEN_BAGUA_MAP } from "../utils/liuyaoEngine";
@@ -49,23 +49,53 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
   const [minute, setMinute] = useState<number>(date.getMinutes());
 
   // 數字卦三個三位數 (第一數求下卦、第二數求上卦、第三數求動爻)
-  const [num1, setNum1] = useState<number>(initialValues?.numberNumbers?.[0] || 431);
-  const [num2, setNum2] = useState<number>(initialValues?.numberNumbers?.[1] || 379);
-  const [num3, setNum3] = useState<number>(initialValues?.numberNumbers?.[2] || 847);
-
-  // Derived calculation
-  const [numGuaCalc, setNumGuaCalc] = useState<NumberGuaCalculation>(() =>
-    calculateNumberGua(num1, num2, num3)
+  const [numStr1, setNumStr1] = useState<string>(
+    initialValues?.numberNumbers?.[0] ? String(initialValues.numberNumbers[0]) : "431"
   );
+  const [numStr2, setNumStr2] = useState<string>(
+    initialValues?.numberNumbers?.[1] ? String(initialValues.numberNumbers[1]) : "379"
+  );
+  const [numStr3, setNumStr3] = useState<string>(
+    initialValues?.numberNumbers?.[2] ? String(initialValues.numberNumbers[2]) : "847"
+  );
+  const [validationError, setValidationError] = useState<string>("");
+
+  // Derived validations and calculations
+  const isNum1Valid = numStr1.length === 3;
+  const isNum2Valid = numStr2.length === 3;
+  const isNum3Valid = numStr3.length === 3;
+  const isAllNumbersValid = isNum1Valid && isNum2Valid && isNum3Valid;
+
+  const n1 = isNum1Valid ? parseInt(numStr1, 10) : null;
+  const n2 = isNum2Valid ? parseInt(numStr2, 10) : null;
+  const n3 = isNum3Valid ? parseInt(numStr3, 10) : null;
+
+  const rem1 = n1 !== null ? (n1 % 8 === 0 ? 8 : n1 % 8) : null;
+  const rem2 = n2 !== null ? (n2 % 8 === 0 ? 8 : n2 % 8) : null;
+  const rem3 = n3 !== null ? (n3 % 6 === 0 ? 6 : n3 % 6) : null;
+
+  const [numGuaCalc, setNumGuaCalc] = useState<NumberGuaCalculation | null>(() => {
+    const val1 = parseInt(numStr1, 10);
+    const val2 = parseInt(numStr2, 10);
+    const val3 = parseInt(numStr3, 10);
+    if (val1 >= 100 && val2 >= 100 && val3 >= 100) {
+      return calculateNumberGua(val1, val2, val3);
+    }
+    return null;
+  });
 
   const [ganzhiPreview, setGanzhiPreview] = useState<GanzhiResult>(getGanzhiFromDate(date));
   const [selectedYongShen, setSelectedYongShen] = useState<SixRelative | undefined>(undefined);
 
-  // Update calculation whenever numbers change
+  // Update calculation whenever valid numbers change
   useEffect(() => {
-    const calc = calculateNumberGua(num1, num2, num3);
-    setNumGuaCalc(calc);
-  }, [num1, num2, num3]);
+    if (isAllNumbersValid && n1 !== null && n2 !== null && n3 !== null) {
+      const calc = calculateNumberGua(n1, n2, n3);
+      setNumGuaCalc(calc);
+    } else {
+      setNumGuaCalc(null);
+    }
+  }, [numStr1, numStr2, numStr3, isAllNumbersValid, n1, n2, n3]);
 
   // Sync date when components change
   useEffect(() => {
@@ -89,15 +119,36 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
     setGanzhiPreview(getGanzhiFromDate(now));
   };
 
+  const handleNumChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    // 嚴格限制：僅接受數字，去除所有非數字字元
+    let val = e.target.value.replace(/\D/g, "");
+    // 開頭不允許為 0，避免出現 0 開頭或 0453 之情況
+    if (val.startsWith("0")) {
+      val = val.replace(/^0+/, "");
+    }
+    // 嚴格限制最多 3 位數
+    if (val.length > 3) {
+      val = val.slice(0, 3);
+    }
+    setter(val);
+    setValidationError("");
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAllNumbersValid || !n1 || !n2 || !n3 || !numGuaCalc) {
+      setValidationError("請在三個起卦欄位皆輸入完整的 3 位數字（100 ~ 999）！");
+      return;
+    }
     onCalculate({
       querent: querent.trim() || "求占者",
       question: question.trim() || "問事吉凶",
       date,
       remainders: numGuaCalc.remainders,
       customYongShen: selectedYongShen,
-      numberNumbers: [num1, num2, num3],
+      numberNumbers: [n1, n2, n3],
     });
   };
 
@@ -393,11 +444,12 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
             <div className="my-2">
               <input
                 id="input-number-1"
-                type="number"
-                min={1}
-                max={9999}
-                value={num1}
-                onChange={(e) => setNum1(Number(e.target.value) || 0)}
+                type="text"
+                inputMode="numeric"
+                pattern="[1-9][0-9]{2}"
+                maxLength={3}
+                value={numStr1}
+                onChange={handleNumChange(setNumStr1)}
                 placeholder="例如：431"
                 className="w-full rounded-lg border border-stone-300 bg-white px-3.5 py-2.5 text-center font-mono text-xl font-bold tracking-wider text-stone-900 shadow-2xs focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 required
@@ -405,21 +457,29 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
             </div>
 
             {/* Calculation Result */}
-            <div className="mt-2.5 rounded-lg border border-stone-200 bg-white p-2 text-xs">
-              <div className="flex items-center justify-between text-stone-500 text-[11px] mb-1">
-                <span>運算公式：</span>
-                <span className="font-mono font-medium text-stone-700">
-                  {num1} ÷ 8 = {Math.floor(num1 / 8)} 餘 {numGuaCalc.lowerRemainder}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-t border-stone-100 pt-1.5">
-                <span className="text-stone-600">下卦（內卦）：</span>
-                <span className="font-serif font-bold text-amber-900 text-sm flex items-center gap-1">
-                  <span>{EARLY_HEAVEN_BAGUA_MAP[numGuaCalc.lowerRemainder].symbol}</span>
-                  <span>{numGuaCalc.lowerTrigram}為{EARLY_HEAVEN_BAGUA_MAP[numGuaCalc.lowerRemainder].nature}卦</span>
-                  <span className="text-xs font-mono font-normal text-stone-500">({numGuaCalc.lowerRemainder})</span>
-                </span>
-              </div>
+            <div className="mt-2.5 rounded-lg border border-stone-200 bg-white p-2.5 text-xs min-h-[66px] flex flex-col justify-center">
+              {isNum1Valid && n1 !== null && rem1 !== null ? (
+                <>
+                  <div className="flex items-center justify-between text-stone-500 text-[11px] mb-1">
+                    <span>運算公式：</span>
+                    <span className="font-mono font-medium text-stone-700">
+                      {n1} ÷ 8 = {Math.floor(n1 / 8)} 餘 {rem1}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-stone-100 pt-1.5">
+                    <span className="text-stone-600">下卦（內卦）：</span>
+                    <span className="font-serif font-bold text-amber-900 text-sm flex items-center gap-1">
+                      <span>{EARLY_HEAVEN_BAGUA_MAP[rem1].symbol}</span>
+                      <span>{EARLY_HEAVEN_BAGUA_MAP[rem1].name}為{EARLY_HEAVEN_BAGUA_MAP[rem1].nature}卦</span>
+                      <span className="text-xs font-mono font-normal text-stone-500">({rem1})</span>
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center text-stone-400 py-1">
+                  <span className="text-xs">請輸入 3 位數（100 ~ 999）</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -435,11 +495,12 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
             <div className="my-2">
               <input
                 id="input-number-2"
-                type="number"
-                min={1}
-                max={9999}
-                value={num2}
-                onChange={(e) => setNum2(Number(e.target.value) || 0)}
+                type="text"
+                inputMode="numeric"
+                pattern="[1-9][0-9]{2}"
+                maxLength={3}
+                value={numStr2}
+                onChange={handleNumChange(setNumStr2)}
                 placeholder="例如：379"
                 className="w-full rounded-lg border border-stone-300 bg-white px-3.5 py-2.5 text-center font-mono text-xl font-bold tracking-wider text-stone-900 shadow-2xs focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 required
@@ -447,21 +508,29 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
             </div>
 
             {/* Calculation Result */}
-            <div className="mt-2.5 rounded-lg border border-stone-200 bg-white p-2 text-xs">
-              <div className="flex items-center justify-between text-stone-500 text-[11px] mb-1">
-                <span>運算公式：</span>
-                <span className="font-mono font-medium text-stone-700">
-                  {num2} ÷ 8 = {Math.floor(num2 / 8)} 餘 {numGuaCalc.upperRemainder}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-t border-stone-100 pt-1.5">
-                <span className="text-stone-600">上卦（外卦）：</span>
-                <span className="font-serif font-bold text-amber-900 text-sm flex items-center gap-1">
-                  <span>{EARLY_HEAVEN_BAGUA_MAP[numGuaCalc.upperRemainder].symbol}</span>
-                  <span>{numGuaCalc.upperTrigram}為{EARLY_HEAVEN_BAGUA_MAP[numGuaCalc.upperRemainder].nature}卦</span>
-                  <span className="text-xs font-mono font-normal text-stone-500">({numGuaCalc.upperRemainder})</span>
-                </span>
-              </div>
+            <div className="mt-2.5 rounded-lg border border-stone-200 bg-white p-2.5 text-xs min-h-[66px] flex flex-col justify-center">
+              {isNum2Valid && n2 !== null && rem2 !== null ? (
+                <>
+                  <div className="flex items-center justify-between text-stone-500 text-[11px] mb-1">
+                    <span>運算公式：</span>
+                    <span className="font-mono font-medium text-stone-700">
+                      {n2} ÷ 8 = {Math.floor(n2 / 8)} 餘 {rem2}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-stone-100 pt-1.5">
+                    <span className="text-stone-600">上卦（外卦）：</span>
+                    <span className="font-serif font-bold text-amber-900 text-sm flex items-center gap-1">
+                      <span>{EARLY_HEAVEN_BAGUA_MAP[rem2].symbol}</span>
+                      <span>{EARLY_HEAVEN_BAGUA_MAP[rem2].name}為{EARLY_HEAVEN_BAGUA_MAP[rem2].nature}卦</span>
+                      <span className="text-xs font-mono font-normal text-stone-500">({rem2})</span>
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center text-stone-400 py-1">
+                  <span className="text-xs">請輸入 3 位數（100 ~ 999）</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -477,11 +546,12 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
             <div className="my-2">
               <input
                 id="input-number-3"
-                type="number"
-                min={1}
-                max={9999}
-                value={num3}
-                onChange={(e) => setNum3(Number(e.target.value) || 0)}
+                type="text"
+                inputMode="numeric"
+                pattern="[1-9][0-9]{2}"
+                maxLength={3}
+                value={numStr3}
+                onChange={handleNumChange(setNumStr3)}
                 placeholder="例如：847"
                 className="w-full rounded-lg border border-stone-300 bg-white px-3.5 py-2.5 text-center font-mono text-xl font-bold tracking-wider text-stone-900 shadow-2xs focus:border-rose-600 focus:outline-none focus:ring-1 focus:ring-rose-500"
                 required
@@ -489,22 +559,30 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
             </div>
 
             {/* Calculation Result */}
-            <div className="mt-2.5 rounded-lg border border-stone-200 bg-white p-2 text-xs">
-              <div className="flex items-center justify-between text-stone-500 text-[11px] mb-1">
-                <span>運算公式：</span>
-                <span className="font-mono font-medium text-stone-700">
-                  {num3} ÷ 6 = {Math.floor(num3 / 6)} 餘 {numGuaCalc.movingRemainder}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-t border-stone-100 pt-1.5">
-                <span className="text-stone-600">發動爻位：</span>
-                <span className="font-serif font-bold text-rose-700 text-sm flex items-center gap-1">
-                  <span>第 {numGuaCalc.movingYaoIndex} 爻發動</span>
-                  <span className="text-xs font-normal text-stone-500">
-                    ({["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"][numGuaCalc.movingYaoIndex - 1]})
-                  </span>
-                </span>
-              </div>
+            <div className="mt-2.5 rounded-lg border border-stone-200 bg-white p-2.5 text-xs min-h-[66px] flex flex-col justify-center">
+              {isNum3Valid && n3 !== null && rem3 !== null ? (
+                <>
+                  <div className="flex items-center justify-between text-stone-500 text-[11px] mb-1">
+                    <span>運算公式：</span>
+                    <span className="font-mono font-medium text-stone-700">
+                      {n3} ÷ 6 = {Math.floor(n3 / 6)} 餘 {rem3}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-stone-100 pt-1.5">
+                    <span className="text-stone-600">發動爻位：</span>
+                    <span className="font-serif font-bold text-rose-700 text-sm flex items-center gap-1">
+                      <span>第 {rem3} 爻發動</span>
+                      <span className="text-xs font-normal text-stone-500">
+                        ({["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"][rem3 - 1]})
+                      </span>
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center text-stone-400 py-1">
+                  <span className="text-xs">請輸入 3 位數（100 ~ 999）</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -524,8 +602,8 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 text-center">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => {
               const item = EARLY_HEAVEN_BAGUA_MAP[num];
-              const isLower = numGuaCalc.lowerRemainder === num;
-              const isUpper = numGuaCalc.upperRemainder === num;
+              const isLower = rem1 === num;
+              const isUpper = rem2 === num;
 
               return (
                 <div
@@ -571,121 +649,142 @@ export const DivinationForm: React.FC<DivinationFormProps> = ({
 
         {/* 卦象即時演算預覽條 (本卦、變卦、六爻圖譜) */}
         <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 pb-2.5">
-            <span className="font-serif text-sm font-bold text-stone-900 flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-amber-600" />
-              <span>即時推演卦象：本卦【{numGuaCalc.originalHexagram.name}】之【{numGuaCalc.changedHexagram.name}】</span>
-            </span>
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 border border-amber-300">
-              {numGuaCalc.originalHexagram.palace}宮{numGuaCalc.originalHexagram.palaceTypeName} · {numGuaCalc.movingYaoName}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 本卦預覽 */}
-            <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-2xs">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-serif font-bold text-xs text-stone-800">
-                  本卦：《{numGuaCalc.originalHexagram.name}》
+          {isAllNumbersValid && numGuaCalc ? (
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 pb-2.5">
+                <span className="font-serif text-sm font-bold text-stone-900 flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  <span>即時推演卦象：本卦【{numGuaCalc.originalHexagram.name}】之【{numGuaCalc.changedHexagram.name}】</span>
                 </span>
-                <span className="text-[11px] text-stone-500 font-serif">
-                  上{numGuaCalc.upperTrigram}（{EARLY_HEAVEN_BAGUA_MAP[numGuaCalc.upperRemainder].nature}）下{numGuaCalc.lowerTrigram}（{EARLY_HEAVEN_BAGUA_MAP[numGuaCalc.lowerRemainder].nature}）
+                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 border border-amber-300">
+                  {numGuaCalc.originalHexagram.palace}宮{numGuaCalc.originalHexagram.palaceTypeName} · {numGuaCalc.movingYaoName}
                 </span>
               </div>
 
-              {/* 6 Yao Lines from 上爻 (5) to 初爻 (0) */}
-              <div className="space-y-1 font-mono text-xs">
-                {[5, 4, 3, 2, 1, 0].map((idx) => {
-                  const lineNum = idx + 1;
-                  const isMoving = lineNum === numGuaCalc.movingYaoIndex;
-                  const rem = numGuaCalc.remainders[idx];
-                  const yaoPos = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"][idx];
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 本卦預覽 */}
+                <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-2xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-serif font-bold text-xs text-stone-800">
+                      本卦：《{numGuaCalc.originalHexagram.name}》
+                    </span>
+                    <span className="text-[11px] text-stone-500 font-serif">
+                      上{numGuaCalc.upperTrigram}（{rem2 && EARLY_HEAVEN_BAGUA_MAP[rem2].nature}）下{numGuaCalc.lowerTrigram}（{rem1 && EARLY_HEAVEN_BAGUA_MAP[rem1].nature}）
+                    </span>
+                  </div>
 
-                  return (
-                    <div
-                      key={idx}
-                      className={`flex items-center justify-between rounded px-2 py-1 transition ${
-                        isMoving
-                          ? "bg-rose-50 border border-rose-300 font-bold text-rose-900"
-                          : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-12 text-[11px] font-serif">{yaoPos}</span>
-                        <span className="tracking-widest">
-                          {rem === 7 || rem === 9 ? "▅▅▅▅▅" : "▅▅　▅▅"}
-                        </span>
-                      </div>
-                      <div className="text-[11px]">
-                        {isMoving ? (
-                          <span className="text-rose-600 font-bold">
-                            {rem === 9 ? "老陽 ◯ (發動)" : "老陰 ✕ (發動)"}
-                          </span>
-                        ) : (
-                          <span className="text-stone-500">
-                            {rem === 7 ? "少陽 (靜)" : "少陰 (靜)"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                  {/* 6 Yao Lines from 上爻 (5) to 初爻 (0) */}
+                  <div className="space-y-1 font-mono text-xs">
+                    {[5, 4, 3, 2, 1, 0].map((idx) => {
+                      const lineNum = idx + 1;
+                      const isMoving = lineNum === numGuaCalc.movingYaoIndex;
+                      const rem = numGuaCalc.remainders[idx];
+                      const yaoPos = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"][idx];
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-center justify-between rounded px-2 py-1 transition ${
+                            isMoving
+                              ? "bg-rose-50 border border-rose-300 font-bold text-rose-900"
+                              : "text-stone-700 hover:bg-stone-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-12 text-[11px] font-serif">{yaoPos}</span>
+                            <span className="tracking-widest">
+                              {rem === 7 || rem === 9 ? "▅▅▅▅▅" : "▅▅　▅▅"}
+                            </span>
+                          </div>
+                          <div className="text-[11px]">
+                            {isMoving ? (
+                              <span className="text-rose-600 font-bold">
+                                {rem === 9 ? "老陽 ◯ (發動)" : "老陰 ✕ (發動)"}
+                              </span>
+                            ) : (
+                              <span className="text-stone-500">
+                                {rem === 7 ? "少陽 (靜)" : "少陰 (靜)"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 變卦預覽 */}
+                <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-2xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-serif font-bold text-xs text-stone-800">
+                      之卦（變卦）：《{numGuaCalc.changedHexagram.name}》
+                    </span>
+                    <span className="text-[11px] text-stone-500 font-serif">
+                      上{numGuaCalc.changedHexagram.upperTrigram}下{numGuaCalc.changedHexagram.lowerTrigram} · {numGuaCalc.changedHexagram.palace}宮
+                    </span>
+                  </div>
+
+                  {/* 6 Yao Lines in Changed Hexagram */}
+                  <div className="space-y-1 font-mono text-xs">
+                    {[5, 4, 3, 2, 1, 0].map((idx) => {
+                      const lineNum = idx + 1;
+                      const isMoving = lineNum === numGuaCalc.movingYaoIndex;
+                      const rem = numGuaCalc.remainders[idx];
+                      // changed line value
+                      const changedBit = rem === 6 ? 1 : rem === 9 ? 0 : rem === 7 ? 1 : 0;
+                      const yaoPos = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"][idx];
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-center justify-between rounded px-2 py-1 transition ${
+                            isMoving
+                              ? "bg-amber-50 border border-amber-300 font-bold text-amber-900"
+                              : "text-stone-700 hover:bg-stone-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-12 text-[11px] font-serif">{yaoPos}</span>
+                            <span className="tracking-widest">
+                              {changedBit === 1 ? "▅▅▅▅▅" : "▅▅　▅▅"}
+                            </span>
+                          </div>
+                          <div className="text-[11px]">
+                            {isMoving ? (
+                              <span className="text-amber-800 font-bold">
+                                {changedBit === 1 ? "變少陽 (陽)" : "變少陰 (陰)"}
+                              </span>
+                            ) : (
+                              <span className="text-stone-400">本爻不變</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-6 text-center space-y-1">
+              <span className="font-serif font-semibold text-stone-700 text-sm">
+                請在上方三個欄位輸入完整的 3 位數字
+              </span>
+              <span className="text-xs text-stone-500">
+                三個欄位皆填妥 3 位數（100 ~ 999）後，系統將即時推演出本卦、變卦及六爻動靜圖譜
+              </span>
             </div>
-
-            {/* 變卦預覽 */}
-            <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-2xs">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-serif font-bold text-xs text-stone-800">
-                  之卦（變卦）：《{numGuaCalc.changedHexagram.name}》
-                </span>
-                <span className="text-[11px] text-stone-500 font-serif">
-                  上{numGuaCalc.changedHexagram.upperTrigram}下{numGuaCalc.changedHexagram.lowerTrigram} · {numGuaCalc.changedHexagram.palace}宮
-                </span>
-              </div>
-
-              {/* 6 Yao Lines in Changed Hexagram */}
-              <div className="space-y-1 font-mono text-xs">
-                {[5, 4, 3, 2, 1, 0].map((idx) => {
-                  const lineNum = idx + 1;
-                  const isMoving = lineNum === numGuaCalc.movingYaoIndex;
-                  const rem = numGuaCalc.remainders[idx];
-                  // changed line value
-                  const changedBit = rem === 6 ? 1 : rem === 9 ? 0 : rem === 7 ? 1 : 0;
-                  const yaoPos = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"][idx];
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`flex items-center justify-between rounded px-2 py-1 transition ${
-                        isMoving
-                          ? "bg-amber-50 border border-amber-300 font-bold text-amber-900"
-                          : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-12 text-[11px] font-serif">{yaoPos}</span>
-                        <span className="tracking-widest">
-                          {changedBit === 1 ? "▅▅▅▅▅" : "▅▅　▅▅"}
-                        </span>
-                      </div>
-                      <div className="text-[11px]">
-                        {isMoving ? (
-                          <span className="text-amber-800 font-bold">
-                            {changedBit === 1 ? "變少陽 (陽)" : "變少陰 (陰)"}
-                          </span>
-                        ) : (
-                          <span className="text-stone-400">本爻不變</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* Validation Error Alert */}
+      {validationError && (
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+          <span>{validationError}</span>
+        </div>
+      )}
 
       {/* 4. Action Button */}
       <div className="flex justify-center pt-2">
